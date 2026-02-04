@@ -1,265 +1,255 @@
-# CSSKiller Commander UI
+# CSS Killer Mail Contract Plugin
 
-A full-stack admin UI to remotely run CSSKiller/Tonics commands from the browser. It ships as a PHP plugin (secured HTTP API) plus a modern React/TypeScript frontend (Vite + Tailwind + shadcn/ui + MobX).
+A secure email-based terms acceptance plugin for CSS Killer CMS. This plugin provides a complete solution for collecting user consent through email verification, with built-in token management, audit trails, and automated cleanup.
 
-- Secure API endpoints under `/commander-ui` with Bearer token auth
-- One-click execution of common maintenance commands
-- Flexible Options Builder with reusable Presets
-- Multi-site management (persisted), per-site tokens, active-site memory
-- Responsive UI, animated progress, auto-scroll to results
+## Features
 
----
+- **Secure Email Verification**: Generate cryptographically secure tokens for email confirmation
+- **Terms Acceptance Flow**: Complete workflow from form submission to confirmation
+- **Token Management**: Automatic expiration (24 hours), status tracking, and cleanup
+- **Audit Trail**: Permanent records of confirmed acceptances for compliance
+- **Responsive UI**: Modern, mobile-friendly templates using Tailwind CSS
+- **Console Commands**: Automated cleanup of expired tokens
+- **RESTful API**: JSON endpoints for integration with other systems
 
-## Contents
+## Requirements
 
-- [Architecture](#architecture)
-- [Backend (PHP plugin)](#backend-php-plugin)
-  - [Routes and endpoints](#routes-and-endpoints)
-  - [Authorization](#authorization)
-  - [Response envelope](#response-envelope)
-  - [Examples (cURL)](#examples-curl)
-- [Frontend (Vite app)](#frontend-vite-app)
-  - [Features](#features)
-  - [Local development](#local-development)
-  - [Build](#build)
-  - [Deploy options](#deploy-options)
-- [Presets](#presets)
-- [Usage workflow](#usage-workflow)
-- [Configuration](#configuration)
-- [Troubleshooting](#troubleshooting)
-- [Project layout](#project-layout)
+- PHP 8.2 or higher
+- CSS Killer CMS
+- Composer for dependency management
 
----
+## Installation
 
-## Architecture
-
-```
-root/
-├─ src/                         # PHP plugin (routes, controllers, middleware)
-│  ├─ Routes.php                # /commander-ui endpoints
-│  ├─ controllers/CommanderController.php
-│  ├─ middlewares/AuthMiddleware.php
-│  └─ templates/                # (optional) template stubs
-├─ vendor/                      # composer deps
-├─ vite/csskiller-plugin-commander-ui/   # React + TypeScript UI
-│  ├─ csskiller-plugin-commander-ui/ # React + TypeScript UI
-│  └─ assets/                     # built static assets
-├─ composer.json
-└─ README.md
+1. Install via Composer:
+```bash
+composer require devsrealm/csskiller-plugin-mail-contract
 ```
 
-- Backend exposes command endpoints and executes Core console commands in a safe, non-CLI mode.
-- Frontend consumes those endpoints via Bearer token, provides a simple UI for flags/options, and persists sites/presets locally.
+2. Enable the plugin in your CSS Killer CMS admin panel
 
----
+3. Configure your email settings in the CMS configuration
 
-## Backend (PHP plugin)
+## Usage
 
-### Routes and endpoints
-Defined in `src/Routes.php` and handled in `src/controllers/CommanderController.php`.
+### Basic Terms Acceptance Flow
 
-Base path: `/commander-ui`
+1. **Display Terms Form**: Direct users to `/terms` to show the acceptance form
+2. **Submit Email**: User enters their email and submits the form
+3. **Email Confirmation**: System sends a secure confirmation link via email
+4. **Confirm Acceptance**: User clicks the link to confirm their acceptance
+5. **Success Page**: User sees confirmation of successful acceptance
 
-- `GET  /commander-ui/sites`
-  - Returns a list of supported site base URLs (driven by env `COMMANDER_UI_SITES` or a comma/JSON list).
-- `POST /commander-ui/init`
-  - Runs Init CMS (`Core\commands\InitCMSCommand`).
-- `GET  /commander-ui/versions`
-  - Lists CMS versions (`Core\commands\ListCMSVersionsCommand`).
-- `POST /commander-ui/cache/siteground/purge`
-  - Purges SiteGround cache (`Core\commands\SiteGroundCachePurge`).
-- `POST /commander-ui/env`
-  - Runs Env Manager (`Core\commands\EnvManagerCommand`).
-- `POST /commander-ui/migrations/all`
-  - Runs migrations (`Core\MigrateAll`).
+### API Endpoints
 
-Each POST endpoint accepts a JSON body of:
+The plugin provides the following REST endpoints under the `/terms` route:
+
+#### GET `/terms`
+Displays the terms acceptance form.
+
+#### POST `/terms/submit`
+Submits the terms acceptance request.
+
+**Request Body:**
 ```json
 {
-  "options": { "--some:option": "value" },
-  "flags": ["--flag-a", "--flag-b"]
+  "email": "user@example.com"
 }
 ```
 
-### Authorization
-Secured by `AuthMiddleware`:
-- Prefer `Authorization: Bearer <COMMANDER_UI_SECRET>` header.
-- Fallback: `?token=<COMMANDER_UI_SECRET>` query parameter.
-- Env key to set: `COMMANDER_UI_SECRET` (string, non-empty). Requests without a valid token return 401.
-
-### Response envelope
-All endpoints respond with the same envelope:
+**Response:**
 ```json
 {
-  "status": 200,
-  "message": "<human-friendly message>",
-  "data": {
-    "command": "<CommandName>",
-    "class_used": "<Fully\\Qualified\\Class>",
-    "options": { "--example": "value" },
-    "result": <string | array | object>
-  },
-  "more": null
+  "success": true,
+  "message": "Please check your email to confirm your acceptance...",
+  "email": "user@example.com"
 }
 ```
-Notes:
-- `result` may be a string, an array (of primitives or objects), or any JSON-serializable payload.
-- The UI shows `message` inline and uses a renderer that adapts to each shape.
 
-### Examples (cURL)
-Replace `BASE_URL` and `SECRET`.
+#### GET `/terms/confirm?token=<token>`
+Confirms the terms acceptance using the token from the email link.
 
-List versions:
+#### GET `/terms/status?email=<email>`
+Retrieves the status of tokens for a given email address.
+
+**Response:**
+```json
+{
+  "email": "user@example.com",
+  "total_tokens": 2,
+  "tokens": [
+    {
+      "id": 1,
+      "token": "abc123...",
+      "data": {
+        "email": "user@example.com",
+        "status": "confirmed",
+        "expires_at": "2024-01-01 12:00:00",
+        "confirmed_at": "2024-01-01 10:30:00"
+      },
+      "created_at": "2024-01-01 09:00:00",
+      "updated_at": "2024-01-01 10:30:00"
+    }
+  ]
+}
+```
+
+### Console Commands
+
+#### Cleanup Expired Tokens
+
+Remove expired pending tokens while preserving confirmed tokens for audit purposes:
+
 ```bash
-curl -H "Authorization: Bearer SECRET" \
-  "BASE_URL/commander-ui/versions"
+php console --cleanup:terms:tokens
 ```
 
-Init CMS (auto-generate SANITY token):
-```bash
-curl -X POST -H "Authorization: Bearer SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "options": { "--set-auto-gen": "SANITY_BEARER_TOKEN" },
-    "flags": []
-  }' \
-  "BASE_URL/commander-ui/init"
+This command:
+- Removes tokens that have expired and are still pending
+- Preserves all confirmed tokens as permanent audit records
+- Should be run periodically (e.g., via cron job)
+
+### Programmatic Usage
+
+#### Using the TokenSignatureService
+
+```php
+use CSSKillerMailContract\services\TokenSignatureService;
+
+// Generate a confirmation token
+$service = new TokenSignatureService($core);
+$token = $service->generateToken('user@example.com', [
+    'ip_address' => $_SERVER['REMOTE_ADDR'],
+    'user_agent' => $_SERVER['HTTP_USER_AGENT']
+]);
+
+// Generate a full confirmation link
+$confirmation = $service->generateConfirmationLink(
+    email: 'user@example.com',
+    baseUrl: 'https://yoursite.com/terms/confirm',
+    metadata: ['source' => 'registration']
+);
+
+// Validate a token
+$result = $service->validateToken($token);
+if ($result['valid']) {
+    // Mark as confirmed
+    $service->markAsConfirmed($token, $_SERVER['REMOTE_ADDR']);
+}
+
+// Get all tokens for an email
+$tokens = $service->getTokensByEmail('user@example.com');
 ```
-
-SiteGround purge:
-```bash
-curl -X POST -H "Authorization: Bearer SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{ "options": { "--sg:purge": "example.com" } }' \
-  "BASE_URL/commander-ui/cache/siteground/purge"
-```
-
-Migrate all:
-```bash
-curl -X POST -H "Authorization: Bearer SECRET" \
-  -H "Content-Type: application/json" \
-  -d '{ "options": { "--migrate:all": "" } }' \
-  "BASE_URL/commander-ui/migrations/all"
-```
-
----
-
-## Frontend (Vite app)
-Location: `vite/csskiller-plugin-commander-ui`
-
-### Features
-- Presets: quick-apply reusable options/flags; save/delete your own
-- Options Builder: add/edit `--option` values and `--flags` inline
-- Site manager: add/remove sites, per-site tokens, import supported sites, remember last active site
-- SiteGround domain helper: pick domain from sites to set `--sg:purge`
-- Animated progress: indeterminate bar while running, auto-scrolls into view on RUN
-- Responsive layout: header, tabs, and pages adapt for mobile/desktop
-
-### Local development
-
-```cmd
-cd vite/csskiller-plugin-commander-ui
-pnpm install
-pnpm dev
-```
-
-Open the dev URL, configure a Site + Token in the header, then run commands.
-
-### Build
-```cmd
-cd vite/csskiller-plugin-commander-ui
-pnpm build
-```
-Outputs static assets to `vite/assets/`.
-
-### Deploy options
-- Serve `vite/assets/` via your web server (Nginx/Apache) and point it at the API origin(s).
-- Or embed within an existing admin area—UI calls your `/commander-ui/*` endpoints.
-- If hosting UI on a different origin, configure CORS on the backend.
-
----
-
-## Presets
-Built-in presets (you can add your own from the UI):
-
-- Init CMS:
-  - Auto-generate SANITY_BEARER_TOKEN → `--set-auto-gen: SANITY_BEARER_TOKEN`
-  - Full Init Template:
-    - `--path`: `/path/to/new-cms`
-    - `--set:DB_HOST`: `localhost`
-    - `--set:BASE_URL`: `https://xxxxxx`
-    - `--set:HOSTNAME`: `xxxxxxxxx`
-    - `--set:TOKEN`: `xxxxxxxxxxxxxx`
-    - `--set:DB_DATABASE`: `xxxxxxxx`
-    - `--set:DB_USERNAME`: `xxxxxxxxxxx`
-    - `--set:DB_PASSWORD`: `xxxxxxxxxxxxxxx`
-    - `--set-auto-gen`: `SANITY_BEARER_TOKEN`
-
-- Env Manager:
-  - Auto-generate SANITY_BEARER_TOKEN → `--set-auto-gen: SANITY_BEARER_TOKEN` (optionally add `--path` to target a specific .env)
-  - Update .env Template:
-    - `--path`: `/path/to/.env`
-    - `--set:DB_HOST`: `localhost`, plus related keys as above
-
-- SiteGround Cache:
-  - Purge Cache (Domain): `--sg:purge: <yourdomain.com>` (or pick from Sites Manager)
-
-- Versions:
-  - List CMS Versions: `--list:cms-versions`
-
-- Migrations:
-  - Migrate All: `--migrate:all`
-
-When you click Apply, the UI switches to the **Options** tab so you can tweak values before running.
-
----
-
-## Usage workflow
-1. Open the UI; add a site (base URL) and set a token (same as `COMMANDER_UI_SECRET`).
-2. Pick a command from the sidebar.
-3. Click **Show Options** → choose a Preset or compose your own.
-4. Click **Run**.
-   - The screen auto-scrolls to the progress area.
-   - The progress bar animates while running, then results render below.
-5. Save useful options combos as Presets for reuse.
-
----
 
 ## Configuration
-- Backend (env):
-  - `COMMANDER_UI_SECRET`: required; shared secret for Bearer auth.
-  - `COMMANDER_UI_SITES`: optional; JSON or comma-separated list of URLs used by `/commander-ui/sites`.
-- Frontend:
-  - No build-time config needed. Sites/tokens/presets persist in browser `localStorage`.
 
-Security:
-- Use HTTPS and a strong `COMMANDER_UI_SECRET`.
-- Do not expose `/commander-ui/*` endpoints without auth.
+### Environment Variables
 
----
+No additional environment variables are required beyond standard CSS Killer CMS configuration.
 
-## Troubleshooting
-- 401 Unauthorized: ensure the Authorization header uses the correct secret and origin.
-- Progress bar doesn’t move: hard-refresh to pick up CSS. Ensure you’re on a command screen and click RUN—an indeterminate bar should animate.
-- Auto-scroll not visible: long options may push content; we auto-scroll on RUN and when loading begins. If your sticky header height differs, adjust the `headerOffset` (default ~96px) in `CommandWrapper.tsx`.
-- CORS errors: if the UI is on a different origin, set up CORS on the backend.
-- Site import fails: the root URL must expose `/commander-ui/sites` and accept your token.
+### Email Configuration
 
----
+The plugin uses PHP's built-in `mail()` function by default. For production use, you should configure a proper email service in your CMS settings.
 
-## Project layout
-- `composer.json`, `vendor/` — PHP deps
-- `src/` — plugin source
-  - `Routes.php` — endpoint registration
-  - `controllers/CommanderController.php` — runs Core commands, returns envelope
-  - `middlewares/AuthMiddleware.php` — Bearer auth
-- `vite/csskiller-plugin-commander-ui/` — React app
-  - `src/components/` — UI (commands, layout, shadcn/ui)
-  - `src/stores/` — MobX stores (Commander, Site)
-  - `src/lib/api.ts` — Axios wrapper (envelope-aware)
-  - `vite/assets/` — built assets
+### Token Settings
 
----
+- **Token Expiry**: 24 hours (configurable in `TokenSignatureService::TOKEN_EXPIRY_HOURS`)
+- **Token Length**: 64 characters (32 bytes of random data, hex-encoded)
+- **Storage**: Tokens are stored in the CMS `system_global` table with context `MAIL_SIGN`
+
+## Security Features
+
+- **Cryptographically Secure Tokens**: Uses `random_bytes()` for token generation
+- **Token Expiration**: Automatic expiration prevents indefinite validity
+- **Single-Use Tokens**: Tokens can only be confirmed once
+- **IP Tracking**: Records IP addresses for audit purposes
+- **Metadata Storage**: Stores user agent, timestamps, and custom metadata
+- **Audit Preservation**: Confirmed tokens are never deleted for compliance
+
+## Templates
+
+The plugin includes the following templates (located in `src/templates/`):
+
+- `terms-form.html` - The main terms acceptance form
+- `terms-success.html` - Success confirmation page
+- `terms-error.html` - Error display page
+
+Templates use the CSS Killer CMS template system and can be customized by overriding them in your theme.
+
+## Database Storage
+
+Tokens are stored in the `system_global` table with:
+- `context`: `MAIL_SIGN`
+- `key`: The token string
+- `value_json`: JSON data containing email, status, expiry, metadata, etc.
+
+## Compliance & GDPR
+
+- **Audit Trail**: All confirmations are permanently stored
+- **Data Minimization**: Only necessary data is collected
+- **Consent Records**: Permanent proof of user consent
+- **Cleanup**: Automated removal of unconfirmed/expired data
+
+## Development
+
+### Project Structure
+
+```
+src/
+├── PluginEntry.php              # Plugin registration
+├── Routes.php                   # Route definitions
+├── controllers/
+│   └── TermsAcceptanceController.php
+├── services/
+│   └── TokenSignatureService.php
+├── commands/
+│   └── CleanupExpiredTokensCommand.php
+├── middlewares/
+│   └── AuthMiddleware.php
+└── templates/
+    ├── terms-form.html
+    ├── terms-success.html
+    └── terms-error.html
+```
+
+### Extending the Plugin
+
+#### Custom Email Templates
+
+Override the email sending in `TermsAcceptanceController::sendConfirmationEmail()` to use your preferred email service.
+
+#### Additional Metadata
+
+Pass additional metadata when generating tokens:
+
+```php
+$confirmation = $service->generateConfirmationLink(
+    email: $email,
+    baseUrl: $baseUrl,
+    metadata: [
+        'custom_field' => 'value',
+        'user_id' => 123,
+        'campaign' => 'newsletter_signup'
+    ]
+);
+```
+
+#### Custom Validation
+
+Extend the controller to add custom validation logic before token generation.
 
 ## License
-Commercial license. Do not share or redistribute without permission.
+
+This plugin is licensed under the GNU Affero General Public License v3.0.
+
+## Support
+
+For support and contributions, please contact the maintainer or create an issue in the project repository.
+
+## Changelog
+
+### Version 1.0.0
+- Initial release
+- Basic terms acceptance flow
+- Token management service
+- Console cleanup command
+- Responsive templates
