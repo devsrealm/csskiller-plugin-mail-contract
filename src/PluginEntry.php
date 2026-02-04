@@ -4,7 +4,7 @@ namespace CSSKillerMailContract;
 
 use Core\events\OnRegisterConsoleCommand;
 use Core\interfaces\ExtensionConfig;
-use CSSKillerMailContract\commands\CleanupExpiredTokensCommand;
+use CSSKillerMailContract\eventHandlers\CustomCommandRegistrar;
 use Devsrealm\TonicsRouterSystem\Route;
 
 class PluginEntry implements ExtensionConfig
@@ -18,7 +18,7 @@ class PluginEntry implements ExtensionConfig
     {
         return [
             OnRegisterConsoleCommand::class => [
-                CleanupExpiredTokensCommand::class
+                CustomCommandRegistrar::class
             ]
         ];
     }
