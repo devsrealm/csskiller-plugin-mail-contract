@@ -1,0 +1,149 @@
+[[inherit("templates::theme")]]
+
+[[hook_into('in_head')
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms and Conditions - Accept</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    body {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    .form-container {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        padding: 40px;
+        max-width: 600px;
+        width: 100%;
+    }
+    .btn-submit {
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+</style>
+]]
+
+[[hook_into('in_body')
+<div class="form-container">
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Terms and Conditions</h1>
+        <p class="text-gray-600">Please read and accept our terms to continue</p>
+    </div>
+
+    <div class="bg-gray-50 rounded-lg p-6 mb-6 max-h-64 overflow-y-auto">
+        <h2 class="text-lg font-semibold text-gray-800 mb-3">Agreement Terms</h2>
+        <p class="text-gray-700 text-sm leading-relaxed mb-3">
+            By accepting these terms, you agree to our policies and conditions. This includes how we process your data,
+            your rights and responsibilities, and our commitment to protecting your information.
+        </p>
+        <p class="text-gray-700 text-sm leading-relaxed mb-3">
+            We will send you a confirmation email to verify your acceptance. Please click the link in the email
+            within 24 hours to complete the process.
+        </p>
+        <p class="text-gray-700 text-sm leading-relaxed">
+            For full terms and conditions, please visit our <a href="/terms" class="text-gray-800 hover:text-black underline">terms page</a>.
+        </p>
+    </div>
+
+    <form id="termsForm" method="POST" action="/terms/submit">
+        <div class="mb-6">
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                Email Address <span class="text-red-500">*</span>
+            </label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-800 focus:border-transparent transition"
+                placeholder="your.email@example.com"
+            />
+            <p class="mt-2 text-xs text-gray-500">
+                We'll send a confirmation link to this email address
+            </p>
+        </div>
+
+        <div class="mb-6">
+            <label class="flex items-start">
+                <input
+                    type="checkbox"
+                    id="agree"
+                    required
+                    class="mt-1 w-4 h-4 text-gray-800 border-gray-300 rounded focus:ring-gray-800"
+                />
+                <span class="ml-2 text-sm text-gray-700">
+                    I have read and agree to the terms and conditions
+                </span>
+            </label>
+        </div>
+
+        <button
+            type="submit"
+            class="btn-submit w-full text-white font-semibold py-3 px-6 rounded-lg"
+        >
+            Accept Terms
+        </button>
+    </form>
+
+    <div id="message" class="mt-6 hidden"></div>
+</div>
+
+<script>
+document.getElementById('termsForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const email = document.getElementById('email').value;
+    const agree = document.getElementById('agree').checked;
+    const messageDiv = document.getElementById('message');
+
+    if (!agree) {
+        messageDiv.className = 'mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg';
+        messageDiv.innerHTML = 'Please agree to the terms and conditions';
+        messageDiv.classList.remove('hidden');
+        return;
+    }
+
+    try {
+        const response = await fetch('/terms/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `email=${encodeURIComponent(email)}`
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            messageDiv.className = 'mt-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg';
+            messageDiv.innerHTML = `
+                <p class="font-semibold mb-2">✓ Success!</p>
+                <p>${data.message}</p>
+            `;
+            document.getElementById('termsForm').reset();
+        } else {
+            messageDiv.className = 'mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg';
+            messageDiv.innerHTML = `<p>Error: ${data.error || 'Something went wrong'}</p>`;
+        }
+
+        messageDiv.classList.remove('hidden');
+    } catch (error) {
+        messageDiv.className = 'mt-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg';
+        messageDiv.innerHTML = '<p>Network error. Please try again.</p>';
+        messageDiv.classList.remove('hidden');
+    }
+});
+</script>
+]]

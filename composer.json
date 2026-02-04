@@ -1,0 +1,32 @@
+{
+  "name": "devsrealm/csskiller-plugin-mail-contract",
+  "description": "CSS Killer Mail Contract Plugin",
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Olayemi Faruq",
+      "email": "olayemi@tonics.app"
+    }
+  ],
+  "require": {
+    "php": ">=8.2",
+    "devsrealm/csskiller-cms": "*"
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/devsrealm/csskiller-cms"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "CSSKillerMailContract\\": "src/"
+    }
+  },
+  "autoload-dev": {},
+  "prefer-stable": true,
+  "extra": {
+    "csskiller-plugin-entry": "CSSKillerMailContract\\PluginEntry"
+  }
+}
